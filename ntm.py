@@ -31,7 +31,7 @@ class NTMCell(tf.keras.layers.Layer):
         num_parameters_per_head = self.memory_vector_dim + 1 + 1 + (self.shift_range * 2 + 1) + 1 #  [k] + beta + g + [s] + gamma
         num_heads = self.read_head_num + self.write_head_num
         total_parameter_num = num_parameters_per_head * num_heads + self.memory_vector_dim * 2 * self.write_head_num # the latter part represents the Erase and Add vectors
-        self.controller =tf.keras.layers.RNN([tf.keras.layers.LSTMCell(controller_units, unit_forget_bias=True) for _ in controller_layers])
+        self.controller =tf.keras.layers.RNN([tf.keras.layers.LSTMCell(controller_units, unit_forget_bias=True) for _ in range(controller_layers)])
         self.output_dim = output_dim
         self.o2p_initializer = create_linear_initializer(self.controller_units)
         self.o2o_initializer = create_linear_initializer(self.controller_units + self.memory_vector_dim * self.read_head_num)
