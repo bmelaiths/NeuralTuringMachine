@@ -141,13 +141,12 @@ class NTMCell(tf.keras.layers.Layer):
 
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
-        if batch_size is None and inputs is not None:
-          batch_size = inputs.batch_size
+
         read_vector_list = [expand(tf.tanh(learned_init(self.memory_vector_dim),name="read_vector"), dim=0, N=batch_size)
             for i in range(self.read_head_num)]
         w_list = [expand(tf.nn.softmax(learned_init(self.memory_size)), dim=0, N=batch_size,name="w")
             for i in range(self.read_head_num + self.write_head_num)]
-        controller_init_state = self.controller.get_initial_state(batch_size=batch_size, dtype=dtype)
+        controller_init_state = self.controller.get_initial_state(inputs)
         M = tf.repeat(tf.expand_dims(tf.fill([ self.memory_size, self.memory_vector_dim], 1e-6),axis=0),batch_size,axis=0,name="M")
         init_state = NTMControllerState(
             controller_state=controller_init_state,
@@ -163,7 +162,7 @@ class NTMCell(tf.keras.layers.Layer):
     @property
     def state_size_nested(self):
         return NTMControllerState(
-            controller_state=self.controller.state_size,
+            controller_state=[self.controller.cell.state_size for _ in range(self.controller_layers)],
             read_vector_list=[self.memory_vector_dim for _ in range(self.read_head_num)],
             w_list=[self.memory_size for _ in range(self.read_head_num + self.write_head_num)],
             M=tf.TensorShape([self.memory_size,self.memory_vector_dim])
