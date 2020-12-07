@@ -17,9 +17,8 @@ NTMControllerState = collections.namedtuple('NTMControllerState', ('controller_s
 
 class NTMCell(tf.keras.layers.Layer):
     def __init__(self,output_dim, controller_layers, controller_units, memory_size, memory_vector_dim, read_head_num, write_head_num,
-                  shift_range=1,  clip_value=20,
-                 init_mode='constant', **kwargs):
-        super().__init__(NTMCell, **kwargs)
+                  shift_range=1,  clip_value=20, **kwargs):
+        super().__init__(name='NTMCell', **kwargs)
         self.controller_layers = controller_layers
         self.controller_units = controller_units
         self.memory_size = memory_size
@@ -28,7 +27,7 @@ class NTMCell(tf.keras.layers.Layer):
         self.write_head_num = write_head_num
         self.clip_value = clip_value
         self.shift_range = shift_range
-        num_parameters_per_head = self.memory_vector_dim + 1 + 1 + (self.shift_range * 2 + 1) + 1 #  [k] + beta + g + [s] + gamma
+        num_parameters_per_head = self.memory_vector_dim + 1 + 1 + (self.shift_range * 2 + 1) + 1 #  k + beta + g + s + gamma
         num_heads = self.read_head_num + self.write_head_num
         total_parameter_num = num_parameters_per_head * num_heads + self.memory_vector_dim * 2 * self.write_head_num # the latter part represents the Erase and Add vectors
         self.controller = tf.keras.layers.LSTMCell(controller_units)
@@ -41,7 +40,7 @@ class NTMCell(tf.keras.layers.Layer):
         self.final_join = tf.keras.layers.Dense(
                 output_dim, activation=None,
                 kernel_initializer=self.o2o_initializer)
-    
+
     def call(self, x, prev_state):
         with tf.name_scope("inputs_to_controller"):
             prev_state = nest.pack_sequence_as(self.state_size_nested, prev_state) # prev state is received as a sequence, make a structure of it
@@ -84,12 +83,13 @@ class NTMCell(tf.keras.layers.Layer):
         # Writing (Sec 3.2)
 
         write_w_list = w_list[self.read_head_num:]
+        M = prev_M
         for i in range(self.write_head_num):
             with tf.name_scope('writing_head%d' % i ):
                 w = tf.expand_dims(write_w_list[i], axis=2)
                 erase_vector = tf.expand_dims(tf.sigmoid(erase_add_list[i * 2]), axis=1)
                 add_vector = tf.expand_dims(tf.tanh(erase_add_list[i * 2 + 1]), axis=1)
-                M = prev_M * (tf.ones([self.memory_size,self.memory_vector_dim]) - tf.matmul(w, erase_vector)) + tf.matmul(w, add_vector)
+                M = M * (tf.ones(M.get_shape()) - tf.matmul(w, erase_vector)) + tf.matmul(w, add_vector)
 
 
         with tf.name_scope("join_outputs"):
@@ -140,13 +140,13 @@ class NTMCell(tf.keras.layers.Layer):
 
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
-
-        read_vector_list = [expand(tf.tanh(learned_init(self.memory_vector_dim),name="read_vector"), dim=0, N=batch_size)
+        del inputs
+        read_vector_list = [expand(tf.tanh(learned_init(self.memory_vector_dim)), dim=0, N=batch_size)
             for i in range(self.read_head_num)]
-        w_list = [expand(tf.nn.softmax(learned_init(self.memory_size)), dim=0, N=batch_size,name="w")
+        w_list = [expand(tf.nn.softmax(learned_init(self.memory_size)), dim=0, N=batch_size)
             for i in range(self.read_head_num + self.write_head_num)]
-        controller_init_state = self.controller.get_initial_state(batch_size=batch_size,dtype=dtype)
-        M = tf.repeat(tf.expand_dims(tf.fill([ self.memory_size, self.memory_vector_dim], 1e-6),axis=0),batch_size,axis=0,name="M")
+        controller_init_state = self.controller.get_initial_state(batch_size=batch_size, dtype=dtype)
+        M = tf.fill([batch_size, self.memory_size, self.memory_vector_dim], 1e-6)
         init_state = NTMControllerState(
             controller_state=controller_init_state,
             read_vector_list=read_vector_list,
