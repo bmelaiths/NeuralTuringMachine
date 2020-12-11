@@ -141,10 +141,11 @@ class NTMCell(tf.keras.layers.Layer):
 
     def get_initial_state(self, inputs=None, batch_size=None, dtype=tf.float32):
         del inputs
-        read_vector_list = [expand(tf.tanh(learned_init(self.memory_vector_dim)), dim=0, N=batch_size)
-            for i in range(self.read_head_num)]
-        w_list = [expand(tf.nn.softmax(learned_init(self.memory_size)), dim=0, N=batch_size)
-            for i in range(self.read_head_num + self.write_head_num)]
+        self.learnable_r_init = [tf.Variable(tf.fill((batch_size,self.memory_vector_dim),1e-6),name="read_vectors") for i in range(self.read_head_num)]
+        self.learnable_w_init = [tf.fill((batch_size,self.memory_size),1e-6) for i in range(self.read_head_num + self.write_head_num)]
+
+        read_vector_list = self.learnable_r_init
+        w_list = self.learnable_w_init
         controller_init_state = self.controller.get_initial_state(batch_size=batch_size, dtype=dtype)
         M = tf.fill([batch_size, self.memory_size, self.memory_vector_dim], 1e-6)
         init_state = NTMControllerState(
