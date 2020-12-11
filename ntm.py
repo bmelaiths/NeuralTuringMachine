@@ -124,10 +124,10 @@ class NTMCell(tf.keras.layers.Layer):
         g = tf.expand_dims(g, axis=1)
         w_g = g * w_c + (1 - g) * prev_w                                        # eq (7)
 
-        s = tf.concat([s[:, :self.shift_range + 1],
+        s_ = tf.concat([s[:, :self.shift_range + 1],
                        tf.zeros([s.get_shape()[0], self.memory_size - (self.shift_range * 2 + 1)]),
                        s[:, -self.shift_range:]], axis=1)
-        t = tf.concat([tf.reverse(s, axis=[1]), tf.reverse(s, axis=[1])], axis=1)
+        t = tf.concat([tf.reverse(s_, axis=[1]), tf.reverse(s_, axis=[1])], axis=1)
         s_matrix = tf.stack(
             [t[:, self.memory_size - i - 1:self.memory_size * 2 - i - 1] for i in range(self.memory_size)],
             axis=1
